@@ -1,6 +1,14 @@
 import os
 import requests
 
+API_KEY = os.getenv('ad819a411d29160fddf766f7f5aade0b')
+
+# Esto nos dirá si la llave tiene la longitud correcta (una clave de The Odds suele tener 32 caracteres)
+if API_KEY:
+    print(f"DEBUG: Longitud de la clave recibida: {len(API_KEY)}")
+else:
+    print("DEBUG: No se recibió ninguna clave.")
+
 API_KEY = os.getenv('ad819a411d29160fddf766f7f5aade0b') 
 BASE_URL = 'https://api.the-odds-api.com/v4/sports'
 
