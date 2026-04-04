@@ -1,0 +1,43 @@
+name: ATP Bypass Daily Scan
+
+on:
+  schedule:
+    # 11:00 UTC es 06:00 AM en Guayaquil (ECT)
+    - cron: "0 11 * * *"
+  workflow_dispatch: # Esto activa el botón "Run workflow" para pruebas manuales
+
+jobs:
+  run-bypass:
+    runs-on: ubuntu-latest
+
+    # Definimos los secretos para que los scripts puedan leerlos
+    env:
+      THE_ODDS_API_KEY: ${{ secrets.THE_ODDS_API_KEY }}
+      TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
+    steps:
+      - name: Descargar Código del Repositorio
+        uses: actions/checkout@v3
+
+      - name: Configurar Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Instalar Librerías Necesarias
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy xgboost scikit-learn requests textblob
+          python -m textblob.download_corpora
+
+      - name: Entrenar Modelo (Solo los Lunes)
+        # 1 es Lunes en el formato de GitHub
+        if: github.event.schedule == '0 11 * * 1' || github.event_name == 'workflow_dispatch'
+        run: |
+          python src/generar_features.py
+          python src/preparar_entrenamiento_ciego.py
+          python src/entrenar_modelo.py
+
+      - name: Ejecutar Escáner de Apuestas
+        run: python src/main.py
