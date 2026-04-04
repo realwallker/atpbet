@@ -2,8 +2,10 @@ name: ATP Bypass Daily Scan
 
 on:
   schedule:
-    - cron: "0 8 * * *" # Scan diario 03:00 AM Ecuador
-    - cron: "0 11 * * 1" # Reentrenamiento lunes 06:00 AM Ecuador
+    # 11:00 UTC = 06:00 AM Ecuador — cuotas del día ya publicadas en Europa
+    - cron: "0 11 * * *"
+    # Reentrenamiento: lunes a las 10:00 UTC
+    - cron: "0 10 * * 1"
   workflow_dispatch:
 
 jobs:
@@ -28,18 +30,17 @@ jobs:
       - name: Crear Estructura de Carpetas
         run: mkdir -p data/raw data/processed
 
-      # ── BLOQUE REENTRENAMIENTO (solo lunes o manual) ──────────────────
+      # ── REENTRENAMIENTO (solo lunes o manual) ────────────────────────
       - name: Reentrenar Modelo
-        if: github.event.schedule == '0 11 * * 1' || github.event_name == 'workflow_dispatch'
+        if: github.event.schedule == '0 10 * * 1' || github.event_name == 'workflow_dispatch'
         env:
           THE_ODDS_API_KEY: ${{ secrets.THE_ODDS_API_KEY }}
         run: |
           python src/generar_features.py
           python src/entrenar_modelo.py
 
-      # Sube AMBOS archivos: el modelo Y las features ELO de jugadores
       - name: Subir Modelo y Features como Artifacts
-        if: github.event.schedule == '0 11 * * 1' || github.event_name == 'workflow_dispatch'
+        if: github.event.schedule == '0 10 * * 1' || github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: modelo-atp-v2
@@ -48,10 +49,9 @@ jobs:
             data/processed/atp_features.csv
           retention-days: 90
 
-      # ── BLOQUE SCANNER DIARIO ─────────────────────────────────────────
-      # Descarga modelo_v2.pkl Y atp_features.csv (necesario para ELO de jugadores)
+      # ── SCANNER DIARIO ───────────────────────────────────────────────
       - name: Descargar Modelo y Features desde Artifacts
-        if: github.event.schedule == '0 8 * * *' || github.event_name == 'workflow_dispatch'
+        if: github.event.schedule == '0 11 * * *' || github.event_name == 'workflow_dispatch'
         uses: actions/download-artifact@v4
         with:
           name: modelo-atp-v2
@@ -59,13 +59,13 @@ jobs:
         continue-on-error: true
 
       - name: Verificar archivos descargados
-        if: github.event.schedule == '0 8 * * *' || github.event_name == 'workflow_dispatch'
+        if: github.event.schedule == '0 11 * * *' || github.event_name == 'workflow_dispatch'
         run: |
           echo "=== Archivos en data/processed/ ==="
-          ls -lh data/processed/ || echo "Carpeta vacía o no existe"
+          ls -lh data/processed/ || echo "Carpeta vacía"
 
       - name: Ejecutar Escáner de Apuestas
-        if: github.event.schedule == '0 8 * * *' || github.event_name == 'workflow_dispatch'
+        if: github.event.schedule == '0 11 * * *' || github.event_name == 'workflow_dispatch'
         env:
           THE_ODDS_API_KEY: ${{ secrets.THE_ODDS_API_KEY }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
