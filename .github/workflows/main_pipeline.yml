@@ -2,10 +2,11 @@ name: ATP Bypass Daily Scan
 
 on:
   schedule:
-    # 08:00 UTC = 03:00 AM en Guayaquil (ECT)
-    # Corre todos los días (lunes a domingo)
+    # 08:00 UTC = 03:00 AM en Guayaquil (ECT) - Todos los días
     - cron: "0 8 * * *"
-  workflow_dispatch: # Mantenlo para pruebas manuales
+    # 11:00 UTC = 06:00 AM en Guayaquil - Solo los lunes (reentrenamiento)
+    - cron: "0 11 * * 1"
+  workflow_dispatch: # Permite ejecución manual desde GitHub
 
 jobs:
   run-bypass:
@@ -29,7 +30,8 @@ jobs:
       - name: Crear Estructura de Carpetas
         run: mkdir -p data/raw data/processed
 
-      - name: Entrenar Modelo (Solo los Lunes o Manual)
+      - name: Reentrenar Modelo (Solo los Lunes o Manual)
+        # FIX: El schedule del if debe coincidir con el cron real declarado arriba
         if: github.event.schedule == '0 11 * * 1' || github.event_name == 'workflow_dispatch'
         env:
           THE_ODDS_API_KEY: ${{ secrets.THE_ODDS_API_KEY }}
@@ -40,11 +42,12 @@ jobs:
           python src/entrenar_modelo.py
 
       - name: Ejecutar Escáner de Apuestas
+        # Solo corre en el scan diario (08:00 UTC) o manual, NO en el reentrenamiento
+        if: github.event.schedule == '0 8 * * *' || github.event_name == 'workflow_dispatch'
         env:
           THE_ODDS_API_KEY: ${{ secrets.THE_ODDS_API_KEY }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           mkdir -p data/processed
-          # Ejecución directa con variables cargadas en el entorno del proceso
           python src/main.py
