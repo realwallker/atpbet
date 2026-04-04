@@ -1,61 +1,70 @@
 import os
 import requests
 
+# Configuración de Identidad y Endpoints
 API_KEY = os.getenv('ad819a411d29160fddf766f7f5aade0b')
-
-# Esto nos dirá si la llave tiene la longitud correcta (una clave de The Odds suele tener 32 caracteres)
-if API_KEY:
-    print(f"DEBUG: Longitud de la clave recibida: {len(API_KEY)}")
-else:
-    print("DEBUG: No se recibió ninguna clave.")
-
-API_KEY = os.getenv('ad819a411d29160fddf766f7f5aade0b') 
 BASE_URL = 'https://api.the-odds-api.com/v4/sports'
 
 def obtener_partidos_atp_hoy():
-    # Solo buscamos la llave de tenis masculino
-    sport_key = 'tennis_atp'
-    url = f"{BASE_URL}/{sport_key}/odds"
-    
+    """
+    Obtiene la cartelera de partidos ATP del día actual usando The Odds API.
+    """
+    if not API_KEY:
+        print("❌ ERROR CRÍTICO: La API Key no fue detectada por el sistema.")
+        return []
+
+    # Parámetros para filtrar solo tenis ATP (Pre-match)
     params = {
         'apiKey': API_KEY,
-        'regions': 'eu',
+        'regions': 'eu,us',
         'markets': 'h2h',
-        'bookmakers': 'pinnacle,bet365',
         'oddsFormat': 'decimal'
     }
-    
-    response = requests.get(url, params=params)
-    
-    if response.status_code == 404:
-        print("⏸️ No hay torneos ATP activos en este momento.")
-        return []
+
+    try:
+        # Petición a la API para el mercado de Tenis ATP
+        url = f"{BASE_URL}/tennis_atp/odds"
+        response = requests.get(url, params=params)
+
+        if response.status_code == 200:
+            partidos = response.json()
+            print(f"✅ Conexión exitosa. Partidos detectados: {len(partidos)}")
+            return partidos
         
-    if response.status_code != 200:
-        print(f"❌ Error API: {response.status_code}")
+        elif response.status_code == 401:
+            print("❌ ERROR 401: Llave de API inválida o no autorizada.")
+            return []
+        
+        else:
+            print(f"⚠️ Error inesperado de la API: {response.status_code}")
+            return []
+
+    except Exception as e:
+        print(f"❌ Error de conexión: {str(e)}")
         return []
-    
-    return response.json()
 
 def extraer_mejores_cuotas(partido):
-    home_team = partido['home_team']
-    cuotas = {}
+    """
+    Extrae la cuota más alta disponible entre todas las casas de apuestas para un partido.
+    """
+    mejores_cuotas = {}
     
-    # Prioridad absoluta a Pinnacle por su exactitud
-    bookmakers = {bm['key']: bm for bm in partido['bookmakers']}
-    
-    selected_bm = None
-    if 'pinnacle' in bookmakers:
-        selected_bm = bookmakers['pinnacle']
-    elif 'bet365' in bookmakers:
-        selected_bm = bookmakers['bet365']
-        
-    if selected_bm:
-        outcomes = selected_bm['markets'][0]['outcomes']
-        for opt in outcomes:
-            if opt['name'] == home_team:
-                cuotas['P1'] = opt['price']
-            else:
-                cuotas['P2'] = opt['price']
-    
-    return cuotas
+    if 'bookmakers' not in partido:
+        return None
+
+    for bookmaker in partido['bookmakers']:
+        for market in bookmaker['markets']:
+            if market['key'] == 'h2h':
+                for outcome in market['outcomes']:
+                    jugador = outcome['name']
+                    cuota = outcome['price']
+                    
+                    if jugador not in mejores_cuotas or cuota > mejores_cuotas[jugador]:
+                        mejores_cuotas[jugador] = cuota
+                        
+    return mejores_cuotas
+
+if __name__ == "__main__":
+    # Test de diagnóstico rápido
+    print(f"DEBUG: Buscando llave... {'Detectada' if API_KEY else 'Vacía'}")
+    test = obtener_partidos_atp_hoy()
