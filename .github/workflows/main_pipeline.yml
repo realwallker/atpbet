@@ -2,9 +2,10 @@ name: ATP Bypass Daily Scan
 
 on:
   schedule:
-    # 11:00 UTC equivale a las 06:00 AM en Guayaquil (ECT)
-    - cron: "0 11 * * *"
-  workflow_dispatch: # Permite ejecución manual para pruebas
+    # 08:00 UTC = 03:00 AM en Guayaquil (ECT)
+    # Corre todos los días (lunes a domingo)
+    - cron: "0 8 * * *"
+  workflow_dispatch: # Mantenlo para pruebas manuales
 
 jobs:
   run-bypass:
