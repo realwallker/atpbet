@@ -2,11 +2,9 @@ name: ATP Bypass Daily Scan
 
 on:
   schedule:
-    # 08:00 UTC = 03:00 AM en Guayaquil (ECT) - Todos los días
-    - cron: "0 8 * * *"
-    # 11:00 UTC = 06:00 AM en Guayaquil - Solo los lunes (reentrenamiento)
-    - cron: "0 11 * * 1"
-  workflow_dispatch: # Permite ejecución manual desde GitHub
+    - cron: "0 8 * * *" # Scan diario 03:00 AM Ecuador
+    - cron: "0 11 * * 1" # Reentrenamiento lunes 06:00 AM Ecuador
+  workflow_dispatch:
 
 jobs:
   run-bypass:
@@ -30,19 +28,33 @@ jobs:
       - name: Crear Estructura de Carpetas
         run: mkdir -p data/raw data/processed
 
-      - name: Reentrenar Modelo (Solo los Lunes o Manual)
-        # FIX: El schedule del if debe coincidir con el cron real declarado arriba
+      # ── BLOQUE REENTRENAMIENTO (solo lunes o manual) ──────────────────
+      - name: Reentrenar Modelo
         if: github.event.schedule == '0 11 * * 1' || github.event_name == 'workflow_dispatch'
         env:
           THE_ODDS_API_KEY: ${{ secrets.THE_ODDS_API_KEY }}
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           python src/generar_features.py
           python src/entrenar_modelo.py
 
+      - name: Subir Modelo como Artifact
+        if: github.event.schedule == '0 11 * * 1' || github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: modelo-atp-v2
+          path: data/processed/modelo_v2.pkl
+          retention-days: 90 # GitHub lo guarda 90 días gratis
+
+      # ── BLOQUE SCANNER DIARIO ─────────────────────────────────────────
+      - name: Descargar Modelo desde Artifacts
+        if: github.event.schedule == '0 8 * * *' || github.event_name == 'workflow_dispatch'
+        uses: actions/download-artifact@v4
+        with:
+          name: modelo-atp-v2
+          path: data/processed/
+        continue-on-error: true # Si no existe aún, no rompe el pipeline
+
       - name: Ejecutar Escáner de Apuestas
-        # Solo corre en el scan diario (08:00 UTC) o manual, NO en el reentrenamiento
         if: github.event.schedule == '0 8 * * *' || github.event_name == 'workflow_dispatch'
         env:
           THE_ODDS_API_KEY: ${{ secrets.THE_ODDS_API_KEY }}
