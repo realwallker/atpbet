@@ -2,7 +2,7 @@ import os
 import requests
 
 # Forzamos la lectura directa del entorno
-API_KEY = os.environ.get('ad819a411d29160fddf766f7f5aade0b')
+API_KEY = os.environ.get('THE_ODDS_API_KEY')
 BASE_URL = 'https://api.the-odds-api.com/v4/sports'
 
 # Lista oficial extraída de la documentación que proporcionaste
