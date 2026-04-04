@@ -3,9 +3,20 @@ import numpy as np
 import os
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-FILE_PATH = os.path.join(BASE_DIR, "..", "data", "processed", "atp_limpio.csv")
+# Cerca de la línea 8 del archivo
+FILE_PATH = os.path.join(BASE_DIR, "..", "data", "raw", "atp_limpio.csv") # <-- Cambiado de processed a raw
 OUTPUT_PATH = os.path.join(BASE_DIR, "..", "data", "processed", "atp_features.csv")
 
+def ejecutar_ingenieria():
+    # Añadimos esto para que GitHub cree la carpeta processed si no existe
+    os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
+    
+    if not os.path.exists(FILE_PATH):
+        print(f"❌ Error crítico: No se encuentra {FILE_PATH}")
+        return
+        
+    df = pd.read_csv(FILE_PATH)
+    # ... resto del código igual ...
 def calcular_elo_multisuperficie(df):
     # Diccionarios de ratings iniciales
     elo_gen = {}

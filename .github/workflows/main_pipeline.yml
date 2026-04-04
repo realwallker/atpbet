@@ -31,6 +31,9 @@ jobs:
           pip install pandas numpy xgboost scikit-learn requests textblob
           python -m textblob.download_corpora
 
+      - name: Crear Estructura de Carpetas
+        run: mkdir -p data/raw data/processed
+
       - name: Entrenar Modelo (Solo los Lunes)
         # 1 es Lunes en el formato de GitHub
         if: github.event.schedule == '0 11 * * 1' || github.event_name == 'workflow_dispatch'
