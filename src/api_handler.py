@@ -1,3 +1,4 @@
+import os
 import requests
 
 API_KEY = os.getenv('ad819a411d29160fddf766f7f5aade0b') 
