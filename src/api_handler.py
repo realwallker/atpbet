@@ -1,52 +1,65 @@
 import os
 import requests
 
-def detectar_llave_maestra():
-    # Intento 1: Nombre exacto
-    key = os.getenv('THE_ODDS_API_KEY')
-    
-    if key:
-        print(f"✅ Llave detectada directamente: {key[:3]}***")
-        return key
-
-    # Intento 2: Buscar variaciones (por si hubo error de dedo al crear el Secret)
-    print("🔍 Buscando variaciones de la llave en el sistema...")
-    for nombre, valor in os.environ.items():
-        if "ODDS" in nombre.upper() or "API" in nombre.upper():
-            if valor and valor != "***": # GitHub oculta el valor, pero el nombre no
-                print(f"📡 ¡Encontré una posible llave! Se llama: '{nombre}'")
-                return valor
-    return None
-
-API_KEY = detectar_llave_maestra()
+API_KEY = os.getenv('ad819a411d29160fddf766f7f5aade0b')
 BASE_URL = 'https://api.the-odds-api.com/v4/sports'
 
 def obtener_partidos_atp_hoy():
+    """
+    Escanea dinámicamente todos los torneos ATP activos para evitar el error 404.
+    """
     if not API_KEY:
-        print("❌ ERROR CRÍTICO: La API Key no fue detectada por el sistema.")
-        # Imprime todos los nombres de variables disponibles para debug (sin los valores)
-        print(f"Variables disponibles: {list(os.environ.keys())}")
+        print("❌ ERROR: API Key no detectada.")
         return []
 
-    params = {
-        'apiKey': API_KEY,
-        'regions': 'eu',
-        'markets': 'h2h',
-        'oddsFormat': 'decimal'
-    }
-
     try:
-        url = f"{BASE_URL}/tennis_atp/odds"
-        response = requests.get(url, params=params)
-        if response.status_code == 200:
-            return response.json()
-        else:
-            print(f"❌ Error API ({response.status_code}): {response.text}")
+        # 1. Obtener la lista de todos los deportes/torneos activos en la API
+        print("🔍 Buscando torneos ATP activos...")
+        res_sports = requests.get(f"{BASE_URL}?apiKey={API_KEY}")
+        
+        if res_sports.status_code != 200:
+            print(f"❌ Error al consultar lista de deportes: {res_sports.status_code}")
             return []
+
+        deportes = res_sports.json()
+        # Filtramos solo los que son Tennis y ATP (excluimos WTA y Challengers por ahora)
+        keys_atp = [d['key'] for d in deportes if 'tennis' in d['key'] and 'atp' in d['key']]
+
+        if not keys_atp:
+            print("⏸️ No hay torneos ATP con mercados abiertos en este momento.")
+            return []
+
+        # 2. Recopilar partidos de todos los torneos encontrados
+        todos_los_partidos = []
+        for key in keys_atp:
+            print(f"📡 Escaneando: {key}...")
+            url = f"{BASE_URL}/{key}/odds"
+            params = {
+                'apiKey': API_KEY,
+                'regions': 'eu,us',
+                'markets': 'h2h',
+                'oddsFormat': 'decimal'
+            }
+            res_odds = requests.get(url, params=params)
+            if res_odds.status_code == 200:
+                todos_los_partidos.extend(res_odds.json())
+
+        print(f"✅ Escaneo completo. Total partidos detectados: {len(todos_los_partidos)}")
+        return todos_los_partidos
+
     except Exception as e:
-        print(f"❌ Error de conexión: {e}")
+        print(f"❌ Error en el proceso del API Handler: {e}")
         return []
 
 def extraer_mejores_cuotas(partido):
-    # (Mantener igual que el anterior)
-    pass
+    mejores_cuotas = {}
+    if 'bookmakers' not in partido: return None
+    for bookmaker in partido['bookmakers']:
+        for market in bookmaker['markets']:
+            if market['key'] == 'h2h':
+                for outcome in market['outcomes']:
+                    jugador = outcome['name']
+                    cuota = outcome['price']
+                    if jugador not in mejores_cuotas or cuota > mejores_cuotas[jugador]:
+                        mejores_cuotas[jugador] = cuota
+    return mejores_cuotas
