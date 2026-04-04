@@ -1,65 +1,64 @@
 import os
 import requests
 
-API_KEY = os.getenv('ad819a411d29160fddf766f7f5aade0b')
+# Forzamos la lectura directa del entorno
+API_KEY = os.environ.get('ad819a411d29160fddf766f7f5aade0b')
 BASE_URL = 'https://api.the-odds-api.com/v4/sports'
 
+# Lista oficial extraída de la documentación que proporcionaste
+ATP_KEYS = [
+    "tennis_atp", "tennis_atp_aus_open_singles", "tennis_atp_canadian_open",
+    "tennis_atp_china_open", "tennis_atp_cincinnati_open", "tennis_atp_dubai",
+    "tennis_atp_french_open", "tennis_atp_indian_wells", "tennis_atp_italian_open",
+    "tennis_atp_madrid_open", "tennis_atp_miami_open", "tennis_atp_monte_carlo_masters",
+    "tennis_atp_paris_masters", "tennis_atp_qatar_open", "tennis_atp_shanghai_masters",
+    "tennis_atp_us_open", "tennis_atp_wimbledon"
+]
+
 def obtener_partidos_atp_hoy():
-    """
-    Escanea dinámicamente todos los torneos ATP activos para evitar el error 404.
-    """
     if not API_KEY:
-        print("❌ ERROR: API Key no detectada.")
+        print("❌ ERROR: La variable THE_ODDS_API_KEY está vacía en Python.")
         return []
 
-    try:
-        # 1. Obtener la lista de todos los deportes/torneos activos en la API
-        print("🔍 Buscando torneos ATP activos...")
-        res_sports = requests.get(f"{BASE_URL}?apiKey={API_KEY}")
-        
-        if res_sports.status_code != 200:
-            print(f"❌ Error al consultar lista de deportes: {res_sports.status_code}")
-            return []
-
-        deportes = res_sports.json()
-        # Filtramos solo los que son Tennis y ATP (excluimos WTA y Challengers por ahora)
-        keys_atp = [d['key'] for d in deportes if 'tennis' in d['key'] and 'atp' in d['key']]
-
-        if not keys_atp:
-            print("⏸️ No hay torneos ATP con mercados abiertos en este momento.")
-            return []
-
-        # 2. Recopilar partidos de todos los torneos encontrados
-        todos_los_partidos = []
-        for key in keys_atp:
-            print(f"📡 Escaneando: {key}...")
-            url = f"{BASE_URL}/{key}/odds"
+    todos_los_partidos = []
+    
+    # Probamos primero el genérico y luego los específicos si es necesario
+    print(f"📡 Iniciando escaneo de mercados ATP...")
+    
+    for sport_key in ATP_KEYS:
+        try:
+            url = f"{BASE_URL}/{sport_key}/odds"
             params = {
                 'apiKey': API_KEY,
                 'regions': 'eu,us',
                 'markets': 'h2h',
                 'oddsFormat': 'decimal'
             }
-            res_odds = requests.get(url, params=params)
-            if res_odds.status_code == 200:
-                todos_los_partidos.extend(res_odds.json())
+            response = requests.get(url, params=params)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data:
+                    print(f"✅ Partidos encontrados en: {sport_key} ({len(data)})")
+                    todos_los_partidos.extend(data)
+            elif response.status_code == 401:
+                print("❌ Error 401: Tu API Key fue rechazada por el servidor.")
+                return []
+        except Exception as e:
+            continue
 
-        print(f"✅ Escaneo completo. Total partidos detectados: {len(todos_los_partidos)}")
-        return todos_los_partidos
-
-    except Exception as e:
-        print(f"❌ Error en el proceso del API Handler: {e}")
-        return []
+    if not todos_los_partidos:
+        print("⏸️ No hay partidos activos en los torneos oficiales en este momento.")
+    
+    return todos_los_partidos
 
 def extraer_mejores_cuotas(partido):
     mejores_cuotas = {}
     if 'bookmakers' not in partido: return None
-    for bookmaker in partido['bookmakers']:
-        for market in bookmaker['markets']:
-            if market['key'] == 'h2h':
-                for outcome in market['outcomes']:
-                    jugador = outcome['name']
-                    cuota = outcome['price']
-                    if jugador not in mejores_cuotas or cuota > mejores_cuotas[jugador]:
-                        mejores_cuotas[jugador] = cuota
+    for b in partido['bookmakers']:
+        for m in b['markets']:
+            if m['key'] == 'h2h':
+                for o in m['outcomes']:
+                    if o['name'] not in mejores_cuotas or o['price'] > mejores_cuotas[o['name']]:
+                        mejores_cuotas[o['name']] = o['price']
     return mejores_cuotas
